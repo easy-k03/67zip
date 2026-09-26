@@ -58,15 +58,15 @@ if [ -z "${CXX:-}" ]; then
     fi
 fi
 
-cflags="-std=c++17 -O2 -Wall -Wextra -pthread"
-ldflags="-pthread -lz -llzma"
+cflags="-std=c++17 -O2 -Wall -Wextra -pthread ${CPPFLAGS:-}"
+ldflags="-pthread ${LDFLAGS:-} -lz -llzma"
 # OpenBSD keeps lzma.h in /usr/local/include. NetBSD keeps it in /usr/pkg.
-for inc in /usr/local/include /usr/pkg/include /opt/local/include; do
+for inc in /usr/local/include /usr/pkg/include /opt/local/include /opt/homebrew/include /usr/local/opt/xz/include; do
     if [ -f "$inc/lzma.h" ] || [ -f "$inc/zlib.h" ]; then
         cflags="$cflags -I$inc"
     fi
 done
-for lib in /usr/local/lib /usr/pkg/lib /opt/local/lib; do
+for lib in /usr/local/lib /usr/pkg/lib /opt/local/lib /opt/homebrew/lib /usr/local/opt/xz/lib; do
     if [ -e "$lib/liblzma.so" ] || [ -e "$lib/liblzma.a" ] || [ -e "$lib/libz.so" ] || [ -e "$lib/libz.a" ]; then
         ldflags="-L$lib $ldflags"
     fi
@@ -88,9 +88,13 @@ echo "67zip: CXX=$CXX"
 
 stage=$(mktemp -d)
 mkdir -p "$stage/usr/bin" "$stage/usr/share/man/man1"
-install -m 755 67zip "$stage/usr/bin/67zip"
-install -m 644 packaging/67zip.1 "$stage/usr/share/man/man1/67zip.1"
+# Solaris and illumos install(1) search the path instead of copying the
+# file named on the command line. cp is the same on every target.
+cp 67zip "$stage/usr/bin/67zip"
+cp packaging/67zip.1 "$stage/usr/share/man/man1/67zip.1"
 cp README.md "$stage/README.md"
+chmod 755 "$stage/usr/bin/67zip"
+chmod 644 "$stage/usr/share/man/man1/67zip.1"
 
 mkdir -p dist
 name="67zip-${version}-${os}-${arch}"
@@ -101,6 +105,16 @@ if [ "$kind" = "freebsd" ] && command -v pkg >/dev/null 2>&1; then
     exit 0
 fi
 
-tar -C "$stage" -czf "dist/${name}.tar.gz" .
+# Solaris tar treats -C as a file operand, not an option. GNU tar, BSD tar
+# and illumos tar accept `tar czf - -C dir .`. Fall back to copying the
+# tree next to the archive and archiving that, which every tar accepts.
+if tar czf "dist/${name}.tar.gz" -C "$stage" . 2>/dev/null; then
+    :
+else
+    pack=$(mktemp -d)
+    cp -R "$stage/." "$pack/67zip"
+    (cd "$pack" && tar czf "$root/dist/${name}.tar.gz" 67zip)
+    rm -rf "$pack"
+fi
 rm -rf "$stage"
 echo "67zip: packed dist/${name}.tar.gz"

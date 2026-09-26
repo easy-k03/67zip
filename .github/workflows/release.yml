@@ -52,6 +52,11 @@ jobs:
         run: |
           set -eu
           brew install xz pkg-config
+          # Homebrew on the arm64 runner installs under /opt/homebrew, which
+          # is not a default compiler search path.
+          prefix=$(brew --prefix)
+          export CPPFLAGS="-I${prefix}/include"
+          export LDFLAGS="-L${prefix}/lib"
           sh packaging/stage.sh macos
       - uses: actions/upload-artifact@v4
         with:

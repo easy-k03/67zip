@@ -13,7 +13,7 @@ name: 67zip
 version: "${version}"
 origin: archivers/67zip
 comment: command-line archiver, .67z container
-desc: command-line archiver with the p7zip command set and a .67z container
+desc: command-line archiver with the p7zip command set
 maintainer: 67zip
 www: https://github.com/${GITHUB_REPOSITORY:-67zip/67zip}
 arch: ${arch}

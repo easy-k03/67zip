@@ -27,15 +27,22 @@ BuildArch: ${arch}
 %build
 
 %install
-mkdir -p %{buildroot}/usr/bin %{buildroot}/usr/share/man/man1
-install -m 755 ${stage}/usr/bin/67zip %{buildroot}/usr/bin/67zip
-install -m 644 ${stage}/usr/share/man/man1/67zip.1 %{buildroot}/usr/share/man/man1/67zip.1
+# The staged tree is passed as the build root. Copying here would look
+# for files under a second directory rpmbuild creates on its own.
 
 %files
 /usr/bin/67zip
 /usr/share/man/man1/67zip.1
 EOF
-rpmbuild --define "_topdir $top" -bb "$top/SPECS/67zip.spec"
+# Fedora's rpmbuild does not substitute %{buildroot} inside %install the
+# way a from-source spec expects, and it looks for the installed files
+# under a directory it creates itself. Hand it the staged tree as the
+# build root so %install is a no-op and %files is checked against files
+# that already exist.
+rpmbuild --define "_topdir $top" \
+    --define "buildroot $stage" \
+    --buildroot "$stage" \
+    -bb "$top/SPECS/67zip.spec"
 mkdir -p "$root/dist"
 cp "$top"/RPMS/*/*.rpm "$root/dist/"
 echo "67zip: packed rpm into $root/dist"
