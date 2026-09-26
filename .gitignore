@@ -1,0 +1,14 @@
+67zip
+67zip.exe
+port_test
+*.o
+*.obj
+dist/
+*.deb
+*.rpm
+*.apk
+*.pkg
+*.pkg.tar.zst
+*.tar.gz
+*.zip
+.DS_Store

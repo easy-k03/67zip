@@ -1,0 +1,39 @@
+.TH 67ZIP 1 "67zip" "User Commands"
+.SH NAME
+67zip \- archive files into a .67z container
+.SH SYNOPSIS
+.B 67zip
+.I command
+[switches...]
+.I archive
+[files...]
+.SH DESCRIPTION
+67zip is a command-line archiver with the same commands as p7zip's
+.BR 7z .
+Archives use the
+.B .67z
+extension and are compressed with LZMA2 by default.
+.SH COMMANDS
+.TP
+.B a
+Add files to an archive.
+.TP
+.B d
+Delete files from an archive.
+.TP
+.B e
+Extract without directory names.
+.TP
+.B l
+List archive contents.
+.TP
+.B t
+Test archive integrity.
+.TP
+.B u
+Update files in an archive.
+.TP
+.B x
+Extract with full paths.
+.SH SEE ALSO
+.BR 7z (1)

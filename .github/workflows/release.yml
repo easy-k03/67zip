@@ -1,0 +1,182 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Native GitHub runners. These produce the packages a user can install
+  # without a cross toolchain: deb, rpm, apk, Arch, FreeBSD is separate.
+  # -------------------------------------------------------------------------
+  linux-packages:
+    name: ${{ matrix.distro }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: debian
+            image: debian:stable
+            kind: deb
+          - distro: ubuntu
+            image: ubuntu:24.04
+            kind: deb
+          - distro: fedora
+            image: fedora:41
+            kind: rpm
+          - distro: alpine
+            image: alpine:3.21
+            kind: apk
+          - distro: arch
+            image: archlinux:base
+            kind: arch
+    steps:
+      - uses: actions/checkout@v4
+      - name: package
+        run: |
+          set -eu
+          docker run --rm -v "$PWD":/src -w /src ${{ matrix.image }} \
+            sh -c "sh packaging/in-container.sh ${{ matrix.kind }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 67zip-${{ matrix.distro }}
+          path: dist/*
+
+  macos:
+    name: macos
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build tarball
+        run: |
+          set -eu
+          brew install xz pkg-config
+          sh packaging/stage.sh macos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 67zip-macos
+          path: dist/*
+
+  windows:
+    name: windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build zip
+        shell: pwsh
+        run: |
+          # MSYS2 is preinstalled on windows-latest.
+          $bash = "C:\msys64\usr\bin\bash.exe"
+          & $bash -lc "pacman -S --noconfirm --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-zlib mingw-w64-x86_64-xz"
+          & $bash -lc "cd '$PWD' && export PATH=/mingw64/bin:`$PATH && CXX=x86_64-w64-mingw32-g++ sh packaging/stage.sh windows"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 67zip-windows
+          path: dist/*
+
+  # -------------------------------------------------------------------------
+  # Systems GitHub does not host. vmactions boots a real VM. Each one
+  # installs a compiler and zlib/liblzma, then builds a tarball. Package
+  # formats those systems do not share (deb/rpm) are not faked.
+  # -------------------------------------------------------------------------
+  vm:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: freebsd
+            action: vmactions/freebsd-vm@v1
+            prepare: pkg install -y gmake pkgconf liblzma
+            kind: freebsd
+          - name: openbsd
+            action: vmactions/openbsd-vm@v1
+            prepare: pkg_add gmake xz
+            kind: tarball
+          - name: netbsd
+            action: vmactions/netbsd-vm@v1
+            prepare: pkgin -y install gmake pkg-config xz
+            kind: tarball
+          - name: dragonfly
+            action: vmactions/dragonflybsd-vm@v1
+            prepare: pkg install -y gcc pkgconf xz
+            kind: tarball
+          - name: solaris
+            action: vmactions/solaris-vm@v1
+            prepare: pkg install -y developer/gcc compress/xz
+            kind: tarball
+          - name: illumos
+            action: vmactions/omnios-vm@v1
+            prepare: pkg install gcc xz
+            kind: tarball
+          - name: haiku
+            action: vmactions/haiku-vm@v1
+            prepare: pkgman install -y gcc zlib_devel xz_utils_devel
+            kind: tarball
+    steps:
+      - uses: actions/checkout@v4
+      - name: build
+        uses: ${{ matrix.action }}
+        with:
+          usesh: true
+          sync: rsync
+          prepare: ${{ matrix.prepare }}
+          run: sh packaging/stage.sh ${{ matrix.kind }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 67zip-${{ matrix.name }}
+          path: dist/*
+
+  # Cross builds. These need a target liblzma, which the runner does not
+  # have, so they build xz from source for that target and then 67zip.
+  cross:
+    name: cross-${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows-mingw
+            packages: g++-mingw-w64-x86-64
+            cxx: x86_64-w64-mingw32-g++
+            host: x86_64-w64-mingw32
+            kind: windows
+          - target: android-arm64
+            packages: wget unzip
+            cxx: ""
+            host: aarch64-linux-android
+            kind: android
+    steps:
+      - uses: actions/checkout@v4
+      - name: packages
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.packages }} build-essential
+      - name: build
+        env:
+          CXX: ${{ matrix.cxx }}
+          HOST: ${{ matrix.host }}
+          KIND: ${{ matrix.kind }}
+        run: sh packaging/cross.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 67zip-${{ matrix.target }}
+          path: dist/*
+
+  publish:
+    name: publish
+    needs: [linux-packages, macos, windows, vm, cross]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
