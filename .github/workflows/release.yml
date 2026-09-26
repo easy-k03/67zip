@@ -2,6 +2,7 @@ name: release
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -250,13 +251,29 @@ jobs:
       - illumos
       - haiku
       - cross
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: success()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
+      - name: release name
+        id: rel
+        run: |
+          set -eu
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            short=$(printf '%s' "${GITHUB_SHA}" | cut -c1-7)
+            echo "tag=continuous" >> "$GITHUB_OUTPUT"
+            echo "name=continuous ${short}" >> "$GITHUB_OUTPUT"
+          fi
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          name: ${{ steps.rel.outputs.name }}
+          make_latest: ${{ github.ref_type == 'tag' && 'true' || 'false' }}
+          prerelease: ${{ github.ref_type != 'tag' }}
           files: dist/*
