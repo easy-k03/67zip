@@ -23,20 +23,20 @@ BINDIR   ?= $(PREFIX)/bin
 
 # pkg-config is the source of truth on NixOS. It is optional elsewhere:
 # Android NDK, Haiku and some cross compilers do not ship it.
+#
+# The probe is a shell recipe, not a GNU-make conditional. OpenBSD and
+# NetBSD ship BSD make, which rejects `ifneq` / `$(shell ...)` before it
+# ever runs a rule. A missing pkg-config, or one that does not know zlib
+# and liblzma, leaves the -lz -llzma fallback in place.
 PKG_CONFIG ?= pkg-config
-ifneq ($(shell $(PKG_CONFIG) --exists zlib liblzma && echo yes),)
-  CPPFLAGS += $(shell $(PKG_CONFIG) --cflags zlib liblzma)
-  LDLIBS   += $(shell $(PKG_CONFIG) --libs zlib liblzma)
-else
-  CPPFLAGS += $(ZLIB_CFLAGS) $(LZMA_CFLAGS)
-  LDLIBS   += $(ZLIB_LIBS) $(LZMA_LIBS)
-  ifeq ($(origin ZLIB_LIBS), undefined)
-    LDLIBS += -lz
-  endif
-  ifeq ($(origin LZMA_LIBS), undefined)
-    LDLIBS += -llzma
-  endif
-endif
+# Empty when pkg-config is missing or does not know both libraries.
+PKG_CFLAGS = $(shell $(PKG_CONFIG) --exists zlib liblzma >/dev/null 2>&1 && $(PKG_CONFIG) --cflags zlib liblzma)
+PKG_LIBS   = $(shell $(PKG_CONFIG) --exists zlib liblzma >/dev/null 2>&1 && $(PKG_CONFIG) --libs zlib liblzma)
+# -lz / -llzma are dropped when the caller, or pkg-config, already named them.
+ZLIB_FALLBACK = $(shell printf '%s' "$(PKG_LIBS) $(ZLIB_LIBS)" | grep -q -- -lz || printf '%s' -lz)
+LZMA_FALLBACK = $(shell printf '%s' "$(PKG_LIBS) $(LZMA_LIBS)" | grep -q -- -llzma || printf '%s' -llzma)
+CPPFLAGS += $(PKG_CFLAGS) $(ZLIB_CFLAGS) $(LZMA_CFLAGS)
+LDLIBS   += $(PKG_LIBS) $(ZLIB_LIBS) $(LZMA_LIBS) $(ZLIB_FALLBACK) $(LZMA_FALLBACK)
 
 # libstdc++ / libc++ need pthread on glibc. musl, Android, BSD, macOS and
 # Solaris pull it in differently; linking it is harmless where it exists and

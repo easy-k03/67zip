@@ -278,14 +278,12 @@ std::string format_local_time(int64_t unix_seconds) {
     if (unix_seconds <= 0) return "                   ";
     std::time_t tt = static_cast<std::time_t>(unix_seconds);
     std::tm tm {};
-#if defined(ZIP67_OS_WINDOWS)
-    // localtime_s is MSVC-only. MinGW, ReactOS and the Windows SDK via
-    // mingw-w64 provide localtime_r, which is what a cross build uses.
-#  if defined(_MSC_VER)
-    if (localtime_s(&tm, &tt) != 0) return "                   ";
-#  else
+#if defined(__MINGW32__) && !defined(_UCRT)
+    // Debian's g++-mingw-w64 (msvcrt) declares localtime_r, not localtime_s.
     if (!localtime_r(&tt, &tm)) return "                   ";
-#  endif
+#elif defined(_WIN32)
+    // MSVC and MinGW-w64 ucrt (MSYS2 on windows-latest) declare localtime_s.
+    if (localtime_s(&tm, &tt) != 0) return "                   ";
 #else
     if (!localtime_r(&tt, &tm)) return "                   ";
 #endif

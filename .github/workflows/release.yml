@@ -84,7 +84,8 @@ jobs:
         with:
           usesh: true
           sync: rsync
-          prepare: pkg install -y gmake pkgconf liblzma
+          # liblzma is in base (libarchive). The ports package is named xz.
+          prepare: pkg install -y gmake pkgconf xz
           run: sh packaging/stage.sh freebsd
       - uses: actions/upload-artifact@v4
         with:
@@ -100,7 +101,8 @@ jobs:
         with:
           usesh: true
           sync: rsync
-          prepare: pkg_add gmake xz
+          # OpenBSD base has clang and liblzma. gmake is not required.
+          prepare: pkg_add gmake
           run: sh packaging/stage.sh tarball
       - uses: actions/upload-artifact@v4
         with:
@@ -116,7 +118,9 @@ jobs:
         with:
           usesh: true
           sync: rsync
-          prepare: pkgin -y install gmake pkg-config xz
+          # The 11.0 image has no pkgin. pkg_add reads PKG_PATH, which the
+          # image already points at a live pkgsrc quarterly.
+          prepare: pkg_add gmake pkg-config xz
           run: sh packaging/stage.sh tarball
       - uses: actions/upload-artifact@v4
         with:
@@ -132,7 +136,10 @@ jobs:
         with:
           usesh: true
           sync: rsync
-          prepare: pkg install -y gcc pkgconf xz
+          # Base has the compiler and liblzma. The ports package is xz-utils,
+          # and it is only needed for the xz(1) tool, which the build does
+          # not call.
+          prepare: pkg install -y pkgconf
           run: sh packaging/stage.sh tarball
       - uses: actions/upload-artifact@v4
         with:
@@ -148,7 +155,10 @@ jobs:
         with:
           usesh: true
           sync: rsync
-          prepare: pkg install -y developer/gcc compress/xz
+          # 11.4-gcc ships gcc/g++. IPS pkg has no -y; a missing flag
+          # aborts the job. liblzma is in the base system.
+          release: 11.4-gcc
+          prepare: "true"
           run: sh packaging/stage.sh tarball
       - uses: actions/upload-artifact@v4
         with:
@@ -164,7 +174,10 @@ jobs:
         with:
           usesh: true
           sync: rsync
-          prepare: pkg install gcc xz
+          # The plain image has no gcc. The -build image does, and it
+          # already has the headers a C++17 program needs.
+          release: r151058-build
+          prepare: "true"
           run: sh packaging/stage.sh tarball
       - uses: actions/upload-artifact@v4
         with:
@@ -180,7 +193,8 @@ jobs:
         with:
           usesh: true
           sync: rsync
-          prepare: pkgman install -y gcc zlib_devel xz_utils_devel
+          # gcc is on the image. zlib and liblzma devel packages are not.
+          prepare: pkgman install -y zlib_devel xz_utils_devel
           run: sh packaging/stage.sh tarball
       - uses: actions/upload-artifact@v4
         with:

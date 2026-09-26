@@ -41,9 +41,12 @@ fi
 
 export CC="${HOST}-gcc"
 export CXX="${CXX:-${HOST}-g++}"
-(cd "$workdir/xz-${xzver}" && ./configure --host="$HOST" --prefix="$prefix" && make -j"$(nproc)" && make install)
+# --disable-shared skips the libtool wrapper that cannot map a Linux
+# build directory onto a mingw host path. zlib is already in the mingw
+# sysroot; only liblzma is not.
+(cd "$workdir/xz-${xzver}" && ./configure --host="$HOST" --prefix="$prefix" --disable-shared --disable-nls && make -j"$(nproc)" && make install)
 "$CXX" -std=c++17 -O2 -Wall -Wextra -I"$prefix/include" -L"$prefix/lib" \
-    -o "$workdir/67zip.exe" src/main.cpp src/port.cpp -lz -llzma -static
+    -o "$workdir/67zip.exe" src/main.cpp src/port.cpp "$prefix/lib/liblzma.a" -lz -static
 mkdir -p dist
 version=$(git describe --tags --always 2>/dev/null || echo 0.0.0)
 version=${version#v}

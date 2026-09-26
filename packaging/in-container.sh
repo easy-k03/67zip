@@ -27,10 +27,15 @@ arch)
 esac
 
 make -j"$(nproc)"
-./port_test
+make test
 
 version=$(git describe --tags --always 2>/dev/null || echo 0.0.0)
 version=${version#v}
+# rpm Version is an EVR token. A checkout with no tag describes as a hash,
+# which rpm rejects. Package builds that are not a release use 0.0.0.
+case "$version" in
+    *[!A-Za-z0-9._+]*) version=0.0.0 ;;
+esac
 arch=$(uname -m)
 mkdir -p dist
 
