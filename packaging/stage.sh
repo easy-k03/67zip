@@ -39,26 +39,52 @@ if [ "$kind" = "windows" ]; then
     exit 0
 fi
 
-# Solaris and OmniOS install gcc under /usr/gcc/*/bin and /opt/gcc-*/bin,
-# which are not on the default PATH of a non-login sh.
-if ! command -v c++ >/dev/null 2>&1 && ! command -v g++ >/dev/null 2>&1; then
-    for d in /usr/gcc/*/bin /opt/gcc-*/bin /opt/gcc*/bin; do
-        if [ -x "$d/g++" ]; then
-            PATH="$d:$PATH"
-            export PATH
-            break
-        fi
+# Solaris make and illumos make reject '?='. BSD make rejects '$(shell)'.
+# Do not call make here. Find a C++17 compiler and the two libraries, then
+# compile the two translation units directly.
+if [ -z "${CXX:-}" ]; then
+    for d in /usr/gcc/*/bin /opt/gcc-*/bin /opt/gcc*/bin /usr/bin /usr/local/bin /opt/local/bin; do
+        [ -d "$d" ] || continue
+        if [ -x "$d/g++" ]; then PATH="$d:$PATH"; break; fi
+        if [ -x "$d/clang++" ]; then PATH="$d:$PATH"; break; fi
     done
+    export PATH
+    if command -v g++ >/dev/null 2>&1; then CXX=g++
+    elif command -v clang++ >/dev/null 2>&1; then CXX=clang++
+    elif command -v c++ >/dev/null 2>&1; then CXX=c++
+    else
+        echo "67zip: no C++ compiler on PATH" >&2
+        exit 1
+    fi
 fi
-# BSD make rejects -jN on some releases, and OpenBSD's make is not GNU
-# make. A plain `make` is the portable call. illumos calls it gmake.
-if command -v gmake >/dev/null 2>&1 && ! command -v make >/dev/null 2>&1; then
-    gmake
-    gmake test
-else
-    make
-    make test
+
+cflags="-std=c++17 -O2 -Wall -Wextra -pthread"
+ldflags="-pthread -lz -llzma"
+# OpenBSD keeps lzma.h in /usr/local/include. NetBSD keeps it in /usr/pkg.
+for inc in /usr/local/include /usr/pkg/include /opt/local/include; do
+    if [ -f "$inc/lzma.h" ] || [ -f "$inc/zlib.h" ]; then
+        cflags="$cflags -I$inc"
+    fi
+done
+for lib in /usr/local/lib /usr/pkg/lib /opt/local/lib; do
+    if [ -e "$lib/liblzma.so" ] || [ -e "$lib/liblzma.a" ] || [ -e "$lib/libz.so" ] || [ -e "$lib/libz.a" ]; then
+        ldflags="-L$lib $ldflags"
+    fi
+done
+
+# OpenBSD's base ld wants -Wl,-z,notext when a library is not position
+# independent. It is ignored where the linker does not know the flag only
+# if we do not pass it. Pass it only on OpenBSD.
+if [ "$(uname -s)" = "OpenBSD" ]; then
+    ldflags="$ldflags -Wl,-z,notext"
 fi
+
+echo "67zip: CXX=$CXX"
+"$CXX" $cflags -c -o src/main.o src/main.cpp
+"$CXX" $cflags -c -o src/port.o src/port.cpp
+"$CXX" $cflags -o 67zip src/main.o src/port.o $ldflags
+"$CXX" $cflags -o port_test src/port_test.cpp src/port.cpp
+./port_test
 
 stage=$(mktemp -d)
 mkdir -p "$stage/usr/bin" "$stage/usr/share/man/man1"

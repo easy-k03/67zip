@@ -21,6 +21,11 @@ BuildArch: ${arch}
 %description
 67zip uses the same commands as p7zip. Archives end in .67z.
 
+# Binary package. rpmbuild otherwise looks for a source tarball and a
+# build subdirectory that this spec never creates.
+%prep
+%build
+
 %install
 mkdir -p %{buildroot}/usr/bin %{buildroot}/usr/share/man/man1
 install -m 755 ${stage}/usr/bin/67zip %{buildroot}/usr/bin/67zip

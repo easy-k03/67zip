@@ -91,7 +91,7 @@ bool get_str(std::istream& in, std::string& s) {
     if (!get_u32(in, n)) return false;
     if (n > 64 * 1024 * 1024) return false;
     s.resize(n);
-    if (n && !get_exact(in, s.data(), n)) return false;
+    if (n && !get_exact(in, &s[0], n)) return false;
     return true;
 }
 
@@ -753,7 +753,10 @@ bool parse_switch(const std::string& s, Options& opt, std::string& err) {
         if (starts_with(rest, "x")) {
             std::string n = rest.substr(1);
             if (!n.empty() && std::isdigit(static_cast<unsigned char>(n[0]))) {
-                opt.level = std::clamp(std::atoi(n.c_str()), 0, 9);
+                int level = std::atoi(n.c_str());
+                if (level < 0) level = 0;
+                if (level > 9) level = 9;
+                opt.level = level;
             }
             return true;
         }

@@ -41,12 +41,17 @@ fi
 
 export CC="${HOST}-gcc"
 export CXX="${CXX:-${HOST}-g++}"
-# --disable-shared skips the libtool wrapper that cannot map a Linux
-# build directory onto a mingw host path. zlib is already in the mingw
-# sysroot; only liblzma is not.
+# Debian's mingw sysroot has neither zlib.h nor liblzma. Build both for
+# the target. --disable-shared skips the libtool wrapper that cannot map a
+# Linux build directory onto a mingw host path.
+zlibver=1.3.1
+curl -fsSL "https://zlib.net/zlib-${zlibver}.tar.gz" -o "$workdir/zlib.tar.gz" \
+    || curl -fsSL "https://github.com/madler/zlib/releases/download/v${zlibver}/zlib-${zlibver}.tar.gz" -o "$workdir/zlib.tar.gz"
+tar -C "$workdir" -xzf "$workdir/zlib.tar.gz"
+(cd "$workdir/zlib-${zlibver}" && CHOST="$HOST" CC="$CC" ./configure --prefix="$prefix" --static && make -j"$(nproc)" && make install)
 (cd "$workdir/xz-${xzver}" && ./configure --host="$HOST" --prefix="$prefix" --disable-shared --disable-nls && make -j"$(nproc)" && make install)
 "$CXX" -std=c++17 -O2 -Wall -Wextra -I"$prefix/include" -L"$prefix/lib" \
-    -o "$workdir/67zip.exe" src/main.cpp src/port.cpp "$prefix/lib/liblzma.a" -lz -static
+    -o "$workdir/67zip.exe" src/main.cpp src/port.cpp "$prefix/lib/liblzma.a" "$prefix/lib/libz.a" -static
 mkdir -p dist
 version=$(git describe --tags --always 2>/dev/null || echo 0.0.0)
 version=${version#v}

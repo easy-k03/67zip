@@ -68,7 +68,7 @@ jobs:
         run: |
           $bash = "C:\msys64\usr\bin\bash.exe"
           & $bash -lc "pacman -S --noconfirm --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-zlib mingw-w64-x86_64-xz"
-          & $bash -lc "cd '$PWD' && export PATH=/mingw64/bin:`$PATH && CXX=x86_64-w64-mingw32-g++ sh packaging/stage.sh windows"
+          & $bash -lc "cd '$PWD' && export PATH=/mingw64/bin:`$PATH && CXX=g++ sh packaging/stage.sh windows"
       - uses: actions/upload-artifact@v4
         with:
           name: 67zip-windows
@@ -84,8 +84,8 @@ jobs:
         with:
           usesh: true
           sync: rsync
-          # liblzma is in base (libarchive). The ports package is named xz.
-          prepare: pkg install -y gmake pkgconf xz
+          # liblzma is in the base system. Nothing else is required to compile.
+          prepare: echo freebsd-ready
           run: sh packaging/stage.sh freebsd
       - uses: actions/upload-artifact@v4
         with:
@@ -101,8 +101,8 @@ jobs:
         with:
           usesh: true
           sync: rsync
-          # OpenBSD base has clang and liblzma. gmake is not required.
-          prepare: pkg_add gmake
+          # Base has clang. lzma.h is in the xz package, under /usr/local.
+          prepare: pkg_add xz
           run: sh packaging/stage.sh tarball
       - uses: actions/upload-artifact@v4
         with:
@@ -118,9 +118,9 @@ jobs:
         with:
           usesh: true
           sync: rsync
-          # The 11.0 image has no pkgin. pkg_add reads PKG_PATH, which the
-          # image already points at a live pkgsrc quarterly.
-          prepare: pkg_add gmake pkg-config xz
+          # The 11.0 image has no pkgin. pkg_add reads PKG_PATH. Base has no
+          # lzma.h; the pkgsrc package is xz.
+          prepare: pkg_add xz
           run: sh packaging/stage.sh tarball
       - uses: actions/upload-artifact@v4
         with:
@@ -136,10 +136,8 @@ jobs:
         with:
           usesh: true
           sync: rsync
-          # Base has the compiler and liblzma. The ports package is xz-utils,
-          # and it is only needed for the xz(1) tool, which the build does
-          # not call.
-          prepare: pkg install -y pkgconf
+          # liblzma is in base. stage.sh passes -std=c++17 itself.
+          prepare: echo dragonfly-ready
           run: sh packaging/stage.sh tarball
       - uses: actions/upload-artifact@v4
         with:
@@ -158,7 +156,7 @@ jobs:
           # 11.4-gcc ships gcc/g++. IPS pkg has no -y; a missing flag
           # aborts the job. liblzma is in the base system.
           release: 11.4-gcc
-          prepare: "true"
+          prepare: echo solaris-ready
           run: sh packaging/stage.sh tarball
       - uses: actions/upload-artifact@v4
         with:
@@ -177,7 +175,7 @@ jobs:
           # The plain image has no gcc. The -build image does, and it
           # already has the headers a C++17 program needs.
           release: r151058-build
-          prepare: "true"
+          prepare: echo omnios-ready
           run: sh packaging/stage.sh tarball
       - uses: actions/upload-artifact@v4
         with:

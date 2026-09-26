@@ -278,12 +278,16 @@ std::string format_local_time(int64_t unix_seconds) {
     if (unix_seconds <= 0) return "                   ";
     std::time_t tt = static_cast<std::time_t>(unix_seconds);
     std::tm tm {};
-#if defined(__MINGW32__) && !defined(_UCRT)
-    // Debian's g++-mingw-w64 (msvcrt) declares localtime_r, not localtime_s.
-    if (!localtime_r(&tt, &tm)) return "                   ";
-#elif defined(_WIN32)
-    // MSVC and MinGW-w64 ucrt (MSYS2 on windows-latest) declare localtime_s.
-    if (localtime_s(&tm, &tt) != 0) return "                   ";
+#if defined(_WIN32)
+    // localtime_s is MSVC and MinGW ucrt. localtime_r is the msvcrt cross
+    // toolchain. Neither name is available on both, and both are optional
+    // macros, so neither can be selected with the preprocessor. localtime
+    // is in every C library these builds use. The result is copied out
+    // before anything else can call it; list and extract do not share this
+    // buffer across threads.
+    std::tm* got = std::localtime(&tt);
+    if (!got) return "                   ";
+    tm = *got;
 #else
     if (!localtime_r(&tt, &tm)) return "                   ";
 #endif
