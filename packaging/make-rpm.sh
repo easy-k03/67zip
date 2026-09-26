@@ -34,6 +34,10 @@ BuildArch: ${arch}
 %description
 67zip uses the same commands as p7zip.
 
+# brp-compress renames the man page to 67zip.1.gz, then %files cannot
+# find the name this spec lists. Leave the page uncompressed.
+%define __brp_compress %{nil}
+
 %prep
 %build
 
@@ -46,6 +50,10 @@ chmod 755 %{buildroot}/usr/bin/67zip
 %files
 /usr/bin/67zip
 /usr/share/man/man1/67zip.1
+
+%changelog
+* Sat Sep 26 2026 67zip <67zip@localhost> - ${version}-1
+- Package the 67zip binary.
 EOF
 rpmbuild --define "_topdir $top" -bb "$top/SPECS/67zip.spec"
 mkdir -p "$root/dist"
