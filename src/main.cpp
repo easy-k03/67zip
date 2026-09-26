@@ -939,13 +939,12 @@ bool parse_args(int argc, char** argv, Options& opt, std::string& err) {
 bool ends_looks_ext(const std::string& name);
 
 bool path_exists(const std::string& path) {
-#if defined(ZIP67_NO_FILESYSTEM)
+    // port::stat_path, not std::filesystem. DragonFly's base libstdc++ ships
+    // filesystem as a separate library that a plain -pthread link does not
+    // pull in, and the constrained hosts have no std::filesystem at all.
     port::FileInfo info;
     port::stat_path(path, info);
     return info.exists;
-#else
-    return fs::exists(path);
-#endif
 }
 
 std::string archive_path_for(const Options& opt) {

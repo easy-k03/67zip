@@ -82,7 +82,12 @@ fi
 echo "67zip: CXX=$CXX"
 "$CXX" $cflags -c -o src/main.o src/main.cpp
 "$CXX" $cflags -c -o src/port.o src/port.cpp
-"$CXX" $cflags -o 67zip src/main.o src/port.o $ldflags
+# DragonFly's base libstdc++ keeps std::filesystem in libstdc++fs. Other
+# libstdc++ versions fold it into libstdc++ and do not ship that library,
+# so only link it when the link fails without it.
+if ! "$CXX" $cflags -o 67zip src/main.o src/port.o $ldflags; then
+    "$CXX" $cflags -o 67zip src/main.o src/port.o $ldflags -lstdc++fs
+fi
 "$CXX" $cflags -o port_test src/port_test.cpp src/port.cpp
 ./port_test
 

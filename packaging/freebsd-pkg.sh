@@ -8,11 +8,13 @@ root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$root"
 
 meta=$(mktemp -d)
+# pkg expands %<token> in every manifest field. A literal ".67z" is read
+# as the token "67z". Write the extension without a dot.
 cat > "$meta/+MANIFEST" << EOF
 name: 67zip
 version: "${version}"
 origin: archivers/67zip
-comment: command-line archiver, .67z container
+comment: command-line archiver, 67z container
 desc: command-line archiver with the p7zip command set
 maintainer: 67zip
 www: https://github.com/${GITHUB_REPOSITORY:-67zip/67zip}
