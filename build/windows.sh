@@ -27,6 +27,18 @@ fi
 if [ -n "${ZLIB_PREFIX:-}" ]; then
     flags="$flags -I${ZLIB_PREFIX}/include -L${ZLIB_PREFIX}/lib"
 fi
+# -llzma links the import library and the exe then needs liblzma-5.dll.
+# Static archives plus -static produce one exe that runs without MSYS2.
+static=
+if [ -n "${LZMA_PREFIX:-}" ] && [ -f "${LZMA_PREFIX}/lib/liblzma.a" ]; then
+    static="$static ${LZMA_PREFIX}/lib/liblzma.a"
+fi
+if [ -n "${ZLIB_PREFIX:-}" ] && [ -f "${ZLIB_PREFIX}/lib/libz.a" ]; then
+    static="$static ${ZLIB_PREFIX}/lib/libz.a"
+fi
+if [ -z "$static" ]; then
+    static="-lz -llzma"
+fi
 # shellcheck disable=SC2086
-"$CXX" -std=c++17 -O2 -Wall -Wextra -o 67zip.exe src/main.cpp src/port.cpp $flags -lz -llzma
+"$CXX" -std=c++17 -O2 -Wall -Wextra -static -o 67zip.exe src/main.cpp src/port.cpp $flags $static
 echo "67zip: built $(pwd)/67zip.exe"

@@ -50,8 +50,16 @@ curl -fsSL "https://zlib.net/zlib-${zlibver}.tar.gz" -o "$workdir/zlib.tar.gz" \
 tar -C "$workdir" -xzf "$workdir/zlib.tar.gz"
 (cd "$workdir/zlib-${zlibver}" && CHOST="$HOST" CC="$CC" ./configure --prefix="$prefix" --static && make -j"$(nproc)" && make install)
 (cd "$workdir/xz-${xzver}" && ./configure --host="$HOST" --prefix="$prefix" --disable-shared --disable-nls && make -j"$(nproc)" && make install)
-"$CXX" -std=c++17 -O2 -Wall -Wextra -I"$prefix/include" -L"$prefix/lib" \
-    -o "$workdir/67zip.exe" src/main.cpp src/port.cpp "$prefix/lib/liblzma.a" "$prefix/lib/libz.a" -static
+"$CXX" -std=c++17 -O2 -Wall -Wextra -I"$prefix/include" -static \
+    -o "$workdir/67zip.exe" src/main.cpp src/port.cpp "$prefix/lib/liblzma.a" "$prefix/lib/libz.a"
+if command -v x86_64-w64-mingw32-objdump >/dev/null 2>&1; then
+    deps=$(x86_64-w64-mingw32-objdump -p "$workdir/67zip.exe" | awk '/DLL Name/{print $3}')
+    echo "$deps"
+    echo "$deps" | grep -E 'liblzma|libz|libgcc|libstdc|libwinpthread' && {
+        echo "67zip: 67zip.exe still imports a non-system DLL." >&2
+        exit 1
+    }
+fi
 mkdir -p dist
 version=$(git describe --tags --always 2>/dev/null || echo 0.0.0)
 version=${version#v}

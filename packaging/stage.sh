@@ -28,7 +28,31 @@ if [ "$kind" = "windows" ]; then
         inc="-I/mingw64/include"
         lib="-L/mingw64/lib"
     fi
-    "$CXX" -std=c++17 -O2 -Wall -Wextra $inc $lib -o 67zip.exe src/main.cpp src/port.cpp -lz -llzma
+    # -llzma prefers liblzma.dll.a, so the exe looks for liblzma-5.dll at
+    # runtime. Link the static archives and fold in libgcc/libstdc++ so the
+    # zip runs on a machine that has neither MSYS2 nor those DLLs.
+    libdir=""
+    for d in /mingw64/lib /usr/x86_64-w64-mingw32/lib /usr/lib/gcc/x86_64-w64-mingw32/*/ ; do
+        if [ -f "$d/liblzma.a" ] && [ -f "$d/libz.a" ]; then
+            libdir=$d
+            break
+        fi
+    done
+    if [ -z "$libdir" ]; then
+        echo "67zip: no static liblzma.a and libz.a for the Windows toolchain." >&2
+        echo "67zip: refusing a DLL-linked exe." >&2
+        exit 1
+    fi
+    "$CXX" -std=c++17 -O2 -Wall -Wextra $inc -static -o 67zip.exe \
+        src/main.cpp src/port.cpp "$libdir/liblzma.a" "$libdir/libz.a"
+    if command -v objdump >/dev/null 2>&1; then
+        deps=$(objdump -p 67zip.exe | awk '/DLL Name/{print $3}')
+        echo "$deps"
+        echo "$deps" | grep -E 'liblzma|libz|libgcc|libstdc|libwinpthread' && {
+            echo "67zip: 67zip.exe still imports a non-system DLL." >&2
+            exit 1
+        }
+    fi
     mkdir -p dist
     name="67zip-${version}-windows-x64.zip"
     if command -v zip >/dev/null 2>&1; then
